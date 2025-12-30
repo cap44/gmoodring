@@ -20,6 +20,7 @@ Because the widget tells you exactly how Grok.com is feeling — calm, cranky, o
 
 
 the UI looks like this:
+
 ![Grok's Mood Ring UI](image.png)
 
 ## Installation
