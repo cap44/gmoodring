@@ -1,10 +1,8 @@
 // ==UserScript==
 // @name         Grok Rate Limit Monitor (Mood Ring Edition)
 // @namespace    http://tampermonkey.net/
-// @version      3.1
+// @version      3.2
 // @description  Shows Grok.com rate-limit status with live countdown and smart auto-refresh
-// @author cap44 
-// @coauthor    Microsoft Copilot (AI assistance)
 // @match        https://grok.com/c/*
 // @grant        GM_xmlhttpRequest
 // @run-at       document-end
@@ -70,93 +68,178 @@
     let remainingTokens = 0;
     let totalTokens = 0;
     let nextTokenSeconds = 0;
+    let exhaustedWaitSeconds = 0;
     let windowHours = 0;
+
+    // --- Fuel gauge helpers ---
+    function getFuelPercent() {
+        if (remainingTokens === 0 && exhaustedWaitSeconds > 0) return 0;
+        if (totalTokens === 0) return 0;
+
+        const pct = remainingTokens / totalTokens;
+
+        // Non-linear smoothing (feels like a real gas tank)
+        return Math.round(Math.pow(pct, 0.65) * 100);
+    }
+
+    function updateFuelBar() {
+        const bar = document.getElementById("fuelbar");
+        if (!bar) return;
+
+        const pct = getFuelPercent();
+        bar.style.width = pct + "%";
+
+        let color = "red";
+        if (pct >= 70) color = "limegreen";
+        else if (pct >= 40) color = "gold";
+        else if (pct >= 10) color = "orange";
+
+        if (remainingTokens === 0 && exhaustedWaitSeconds > 0) {
+            color = "purple";
+        }
+
+        bar.style.background = color;
+    }
+
 
     // --- Update widget text ---
     function renderBox() {
-        if (isNaN(nextTokenSeconds)) {
+
+        // Hard exhausted mode
+        if (remainingTokens === 0 && exhaustedWaitSeconds > 0) {
+            const h = Math.floor(exhaustedWaitSeconds / 3600);
+            const m = Math.floor((exhaustedWaitSeconds % 3600) / 60);
+            const s = exhaustedWaitSeconds % 60;
+
             box.innerHTML =
                 `<div style="font-weight:bold; margin-bottom:6px; text-align:center;">
-                    Grok's Mood Ring 3.1
-                 </div>` +
-                `Tokens: ${remainingTokens}/${totalTokens}<br>` +
-                `Next token: unknown<br>` +
+        Grok's Mood Ring 3.2
+     </div>
+     <div style="width:100%; height:6px; background:#333; border-radius:4px; margin:6px 0;">
+        <div id="fuelbar" style="height:100%; width:0%; background:limegreen; border-radius:4px; transition: width 0.4s ease, background 0.4s ease;"></div>
+     </div>` +
+                `Tokens: 0/${totalTokens}<br>` +
+                `Rate limit resets in: ${h}h ${m}m ${s}s<br>` +
                 `Rolling window: ${windowHours}h`;
+            updateFuelBar();
+
             return;
         }
 
+        // Normal mode
         const h = Math.floor(nextTokenSeconds / 3600);
         const m = Math.floor((nextTokenSeconds % 3600) / 60);
         const s = nextTokenSeconds % 60;
 
         box.innerHTML =
             `<div style="font-weight:bold; margin-bottom:6px; text-align:center;">
-                Grok's Mood Ring 3.1
-             </div>` +
+        Grok's Mood Ring 3.2
+     </div>
+     <div style="width:100%; height:6px; background:#333; border-radius:4px; margin:6px 0;">
+        <div id="fuelbar" style="height:100%; width:0%; background:limegreen; border-radius:4px; transition: width 0.4s ease, background 0.4s ease;"></div>
+     </div>` +
             `Tokens: ${remainingTokens}/${totalTokens}<br>` +
             `Next token: ${h}h ${m}m ${s}s<br>` +
             `Rolling window: ${windowHours}h`;
+        updateFuelBar();
     }
-function nudgeGrokUI() { const input = document.querySelector("textarea"); if (input) { input.dispatchEvent(new Event("input", { bubbles: true })); } }
-    // --- Fetch rate limits (POST) ---
-let lastRemaining = 0; // track previous token count
 
-function fetchLimits() {
-    GM_xmlhttpRequest({
-        method: "POST",
-        url: "https://grok.com/rest/rate-limits",
-        headers: { "Content-Type": "application/json" },
-        data: JSON.stringify({
-            requestKind: "DEFAULT",
-            modelName: "grok-3"
-        }),
-        onload: function(response) {
-            try {
-                const json = JSON.parse(response.responseText);
-
-                const newRemaining = json.remainingTokens;
-
-                // Detect unexpected token increases (rolling window behavior)
-                if (newRemaining > lastRemaining) {
-                    nextTokenSeconds = json.lowEffortRateLimits.waitTimeSeconds;
-                }
-if (json.lowEffortRateLimits.waitTimeSeconds === 0 && newRemaining > 0) { nudgeGrokUI(); }
-                lastRemaining = newRemaining;
-                remainingTokens = newRemaining;
-                totalTokens = json.totalTokens;
-                windowHours = json.windowSizeSeconds / 3600;
-
-                renderBox();
-            } catch (e) {
-                box.textContent = "Error parsing rate limits";
-            }
-        },
-        onerror: function() {
-            box.textContent = "Error fetching rate limits";
+    // --- UI nudge ---
+    function nudgeGrokUI() {
+        const input = document.querySelector("textarea");
+        if (input) {
+            input.dispatchEvent(new Event("input", { bubbles: true }));
         }
-    });
-}
+    }
 
+    // --- Fetch rate limits (POST) ---
+    let lastRemaining = 0;
+
+    function fetchLimits() {
+        GM_xmlhttpRequest({
+            method: "POST",
+            url: "https://grok.com/rest/rate-limits",
+            headers: { "Content-Type": "application/json" },
+            data: JSON.stringify({
+                requestKind: "DEFAULT",
+                modelName: "grok-3"
+            }),
+            onload: function(response) {
+                try {
+                    const json = JSON.parse(response.responseText);
+
+                    const newRemaining = json.remainingTokens;
+                    const waitLow = json.lowEffortRateLimits.waitTimeSeconds;
+                    const waitHigh = json.highEffortRateLimits.waitTimeSeconds;
+
+                    // Hard exhausted mode
+                    if (newRemaining === 0) {
+                        const wait = Math.max(waitLow, waitHigh);
+                        if (wait > 0) {
+                            exhaustedWaitSeconds = wait;
+                            nextTokenSeconds = 0;
+                            remainingTokens = 0;
+                            totalTokens = json.totalTokens;
+                            windowHours = json.windowSizeSeconds / 3600;
+                            renderBox();
+                            return;
+                        }
+                    }
+
+                    // Rolling window token return
+                    if (newRemaining > lastRemaining) {
+                        nextTokenSeconds = waitLow;
+                    }
+
+                    // UI stuck fix
+                    if (waitLow === 0 && newRemaining > 0) {
+                        nudgeGrokUI();
+                    }
+
+                    lastRemaining = newRemaining;
+                    remainingTokens = newRemaining;
+                    totalTokens = json.totalTokens;
+                    windowHours = json.windowSizeSeconds / 3600;
+
+                    renderBox();
+
+                } catch (e) {
+                    box.textContent = "Error parsing rate limits";
+                }
+            },
+            onerror: function() {
+                box.textContent = "Error fetching rate limits";
+            }
+        });
+    }
 
     // --- Local countdown tick + auto-refresh ---
-setInterval(() => {
-    if (nextTokenSeconds > 0) {
-        nextTokenSeconds--;
-        renderBox();
-    } else {
-        // Timer hit zero → poll less aggressively
-        if (!window._lastZeroPoll || Date.now() - window._lastZeroPoll > 10000) {
-            window._lastZeroPoll = Date.now();
-            fetchLimits();
-        }
-    }
-}, 1000);
+    setInterval(() => {
 
+        // Hard exhausted countdown
+        if (exhaustedWaitSeconds > 0) {
+            exhaustedWaitSeconds--;
+            renderBox();
+            return;
+        }
+
+        // Normal countdown
+        if (nextTokenSeconds > 0) {
+            nextTokenSeconds--;
+            renderBox();
+        } else {
+            // Poll every 10s when at zero
+            if (!window._lastZeroPoll || Date.now() - window._lastZeroPoll > 10000) {
+                window._lastZeroPoll = Date.now();
+                fetchLimits();
+            }
+        }
+
+    }, 1000);
 
     // --- Refresh after sending a message ---
     document.addEventListener("keydown", e => {
         if (e.key === "Enter") {
-            // Give Grok a moment to update its counters
             setTimeout(fetchLimits, 1500);
         }
     });
