@@ -2,6 +2,8 @@
 // @name         Grok Rate Limit Monitor (Mood Ring Edition)
 // @namespace    http://tampermonkey.net/
 // @version      3.2
+// @author cap44 (https://github.com/cap44/gmoodring)
+// @coauthor Microsoft Copilot (AI assistance)
 // @description  Shows Grok.com rate-limit status with live countdown and smart auto-refresh
 // @match        https://grok.com/c/*
 // @grant        GM_xmlhttpRequest
