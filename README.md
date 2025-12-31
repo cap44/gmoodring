@@ -26,7 +26,7 @@ the UI looks like this:
 ## Installation
 
 1. Install [**TamperMonkey**](https://www.tampermonkey.net/) in your browser.
-2. Open the raw `gmoodring.user.js` file from this repo in your browser.
+2. Open the raw [`gmoodring.user.js`](https://github.com/cap44/gmoodring/raw/refs/heads/main/gmoodring.user.js) file from this repo in your browser.
 3. TamperMonkey will detect it automatically and prompt: **“Install userscript?”**
 4. Click **Install**.
 5. Go to any Grok chat page (`https://grok.com/c/*`) and you should see **Grok’s Mood Ring** in the bottom‑right corner.
