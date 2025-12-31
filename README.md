@@ -23,6 +23,11 @@ the UI looks like this:
 
 ![Grok's Mood Ring UI](image.png)
 
+## System requirements
+Requires a Userscript manager such as [**TamperMonkey**](https://www.tampermonkey.net/), or [**FireMonkey**](https://erosman.github.io/firemonkey/) or [**ViolentMonkey**](https://violentmonkey.github.io/).
+
+Due to the lack of the `GM_xmlhttpRequest` API, the GreaseMonkey extension isn't supported by the userscript.
+
 ## Installation
 
 1. Install [**TamperMonkey**](https://www.tampermonkey.net/) in your browser.
