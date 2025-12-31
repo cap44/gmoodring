@@ -12,6 +12,22 @@
 
 (function() {
     'use strict';
+    // Catch potential GreaseMonkey users and let them know that this script can't work with their userscript manager
+    // Show the popup only once (on first install)
+    (async () => {
+        const warned = await GM.getValue("unsupportedManagerWarned", false);
+
+        if (typeof GM_xmlhttpRequest !== "function" && !warned) {
+            alert(
+            "gmoodring: Hey! This is the 'Grok's Mood Ring' script.\n\n" +
+            "Your userscript manager doesn't support the GM_xmlhttpRequest function this script relies on.\n\n" +
+            "Please switch to TamperMonkey, ViolentMonkey, or FireMonkey.\n" +
+            "Unfortunately, GreaseMonkey isn't supported. Thanks, and have a great day!"
+        );
+
+        await GM.setValue("unsupportedManagerWarned", true);
+    }
+})();
 
     // --- Create floating widget ---
     const box = document.createElement("div");
