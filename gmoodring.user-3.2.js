@@ -21,7 +21,7 @@
             alert(
             "gmoodring: Hey! This is the 'Grok's Mood Ring' script.\n\n" +
             "Your userscript manager doesn't support the GM_xmlhttpRequest function this script relies on.\n\n" +
-            "Please switch to TamperMonkey, ViolentMonkey, or FireMonkey.\n" +
+            "Please switch to TamperMonkey, ViolentMonkey, and/or FireMonkey.\n" +
             "Unfortunately, GreaseMonkey isn't supported. Thanks, and have a great day!"
         );
 
